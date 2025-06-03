@@ -11,50 +11,59 @@ public class TestRunner {
         try {
             //Создание объекта тестируемого класса
             Object testClass = c.getDeclaredConstructor().newInstance();
-
             //Проверки
             Checks.checks(c);
-
-            //Выполнение @BeforeSuite
-            beforeSuiteRunner(c, testClass);
-
-            //Выполнение @Test
-            testRunner(c, testClass);
-
-            //Выполнение @AfterSuite
-            afterSuiteRunner(c, testClass);
+            //Запуск
+            prepereAndRun(c, testClass);
         } catch (Exception e) {
             //Ловим все исключения, для которых не предусмотрели индивидуальную обработку
             System.out.println("Ошибка при запуске тестов:" + e);
         }
     }
 
-    private static void beforeSuiteRunner(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
+    private static void prepereAndRun(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
+        Method beforeSuite = null;
+        Method afterSuite = null;
+        Method beforeTest = null;
+        Method afterTest = null;
+        Map<Integer, Method> testMap = new TreeMap<>();
         for (Method method : c.getDeclaredMethods()) {
             if (method.isAnnotationPresent(BeforeSuite.class)) {
-                method.invoke(testMethod);
+                beforeSuite = method;
             }
-        }
-    }
-
-    private static void afterSuiteRunner(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
-        for (Method method : c.getDeclaredMethods()) {
             if (method.isAnnotationPresent(AfterSuite.class)) {
-                method.invoke(testMethod);
+                afterSuite = method;
+            }
+            if (method.isAnnotationPresent(BeforeTest.class)) {
+                beforeTest = method;
+            }
+            if (method.isAnnotationPresent(AfterTest.class)) {
+                afterTest = method;
+            }
+            if (method.isAnnotationPresent(Test.class)) {
+                int priority = method.getAnnotation((Test.class)).priority();
+                testMap.put(priority, method);
             }
         }
-    }
-
-    private static void testRunner(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
-        runTest(c, testMethod);
-    }
-
-    private static void runBeforeTest(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
-        for (Method method : c.getDeclaredMethods()) {
-            method.getAnnotation(c);
-            if (method.isAnnotationPresent(BeforeTest.class)) {
-                method.invoke(testMethod);
+        //Запуск @BeforeSuite
+        runMethod(beforeSuite, testMethod);
+        //Запуск @Test
+        for (Map.Entry<Integer, Method> map : testMap.entrySet()) {
+            runMethod(beforeTest, testMethod);
+            if (map.getValue().isAnnotationPresent(CsvSource.class)) {
+                runCsvSourceTest(map.getValue(), testMethod);
+            } else {
+                runMethod(map.getValue(), testMethod);
             }
+            runMethod(afterTest, testMethod);
+        }
+        //Запуск @AfterSuite
+        runMethod(afterSuite, testMethod);
+    }
+
+    private static void runMethod(Method method, Object testMethod) throws InvocationTargetException, IllegalAccessException {
+        if (method != null || testMethod != null) {
+            method.invoke(testMethod);
         }
     }
 
@@ -85,35 +94,6 @@ public class TestRunner {
                 }
             }
             testMethod.invoke(test, args);
-        }
-    }
-
-    private static void runTest(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
-        Map<Integer, Method> methodMap = new TreeMap<>();
-        //Получение списка всех тестов, аннотированных @Test
-        for (Method method : c.getDeclaredMethods()) {
-            if (method.isAnnotationPresent(Test.class)) {
-                int priority = method.getAnnotation((Test.class)).priority();
-                methodMap.put(priority, method);
-            }
-        }
-        //Запуск тестов
-        for (Map.Entry<Integer, Method> map : methodMap.entrySet()) {
-            runBeforeTest(c, testMethod);
-            if(map.getValue().isAnnotationPresent(CsvSource.class)){
-                runCsvSourceTest(map.getValue(), testMethod);
-            }else {
-            map.getValue().invoke(testMethod);
-            }
-            runAfterTest(c, testMethod);
-        }
-    }
-
-    private static void runAfterTest(Class c, Object testMethod) throws InvocationTargetException, IllegalAccessException {
-        for (Method method : c.getDeclaredMethods()) {
-            if (method.isAnnotationPresent(AfterTest.class)) {
-                method.invoke(testMethod);
-            }
         }
     }
 }

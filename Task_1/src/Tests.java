@@ -2,22 +2,6 @@ import annotations.*;
 
 public class Tests {
 
-
-    @BeforeSuite
-    public void nonStaticTestBeforeSuite(){
-        System.out.println("run nonStaticTestBeforeSuite");
-    }
-
-    @AfterSuite
-    public void nonStaticTestAfterSuite(){
-        System.out.println("run nonStaticTestAfterSuite");
-    }
-
-    @Test(priority = 11)
-    public void test11(){
-        System.out.println("run @Test(priority = 11)");
-    }
-
     @BeforeSuite
     public static void staticTestBeforeSuite() {
         System.out.println("run @BeforeSuite");
@@ -27,7 +11,6 @@ public class Tests {
     public static void staticTestAfterSuite() {
         System.out.println("run @AfterSuite");
     }
-
 
     @BeforeTest
     public void testBeforeTest() {
