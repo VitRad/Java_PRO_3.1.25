@@ -11,6 +11,7 @@ public class RadionovThreadPool {
             int cnt = i;
             threads[i] = new Thread(() -> {
                 System.out.println("Start thread: " + cnt);
+                new TaskProcessor().process();
             });
             threads[i].start();
         }
