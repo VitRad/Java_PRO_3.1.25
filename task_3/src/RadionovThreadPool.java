@@ -1,31 +1,74 @@
 import java.util.LinkedList;
 
 public class RadionovThreadPool {
-    private final LinkedList<Runnable> queue = new LinkedList<>();
+    private final LinkedList<Runnable> queue;
     private final Thread[] threads;
-    private volatile boolean isShutdown = false;
+    private volatile boolean isShutdown;
 
     public RadionovThreadPool(int pollSize) {
+        this.queue = new LinkedList<>();
         this.threads = new Thread[pollSize];
+        this.isShutdown = false;
         for (int i = 0; i < pollSize; i++) {
-            int cnt = i;
-            threads[i] = new Thread(() -> {
-                System.out.println("Start thread: " + cnt);
-                new TaskProcessor().process();
-            });
-            threads[i].start();
+            TaskProcessor tp = new TaskProcessor("Thread # " + i);
+            tp.start();
+            threads[i] = tp;
         }
     }
+
     public void execute(Runnable task) {
         if (isShutdown) {
             throw new IllegalStateException("Пул потоков остановлен");
         }
+        System.out.println("Выполнение бизнес-логики приложения");
         queue.add(task);
     }
-    public void shutdown() {
+
+    public synchronized void shutdown() {
         isShutdown = true;
-        for (Thread workerThread : threads) {
-            workerThread.interrupt();
+        synchronized (queue) {
+            queue.notifyAll();
+        }
+    }
+
+    public void awaitTermination() throws InterruptedException {
+        for (Thread tp : threads) {
+            tp.join();
+        }
+    }
+
+    private class TaskProcessor extends Thread {
+        public TaskProcessor(String threadName) {
+            super(threadName);
+        }
+
+        @Override
+        public void run() {
+            Runnable task;
+
+            while (true) {
+                synchronized (queue) {
+                    while (queue.isEmpty() && !isShutdown) {
+                        try {
+                            queue.wait();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                    if (isShutdown && queue.isEmpty()) {
+                        return;
+                    }
+
+                    task = queue.poll();
+                }
+
+                try {
+                    task.run();
+                } catch (RuntimeException e) {
+                    System.err.println("Ошибка выполнения задания: " + e.getMessage());
+                }
+            }
         }
     }
 }
